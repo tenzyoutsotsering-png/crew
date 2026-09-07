@@ -2,126 +2,148 @@
 
 import { useState } from "react";
 
-const crews = [
-  { name: "Valora", type: "Finance society", members: 84, color: "violet", emoji: "◈" },
-  { name: "Photography Club", type: "Creative community", members: 126, color: "orange", emoji: "✦" },
-  { name: "Campus Founders", type: "Startup community", members: 58, color: "blue", emoji: "↗" },
-];
-
 const moments = [
-  { title: "First Valora meeting", meta: "32 members · yesterday", emoji: "📸" },
-  { title: "Parakram finals", meta: "18 members · 4 days ago", emoji: "🏆" },
-  { title: "Committee dinner", meta: "11 members · last week", emoji: "🍜" },
+  { title: "Committee chaos", emoji: "📸" },
+  { title: "Prarambh finals", emoji: "🏆" },
+  { title: "That one meeting 😂", emoji: "🍜" },
 ];
 
 export default function Home() {
   const [active, setActive] = useState("Home");
   const [mode, setMode] = useState<"student" | "organizer">("student");
-  const [liked, setLiked] = useState<number | null>(null);
+  const [toastMessage, setToastMessage] = useState("");
+  const [votes, setVotes] = useState<Record<number, string>>({});
   const [duelOpen, setDuelOpen] = useState(false);
-  const [duelResult, setDuelResult] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [targetVisible, setTargetVisible] = useState(false);
+  const [reaction, setReaction] = useState<number | null>(null);
+  const [targetPosition, setTargetPosition] = useState({ left: 45, top: 50 });
+
+  const toast = (message: string) => {
+    setToastMessage(message);
+    window.setTimeout(() => setToastMessage(""), 2600);
+  };
+
+  const vote = (poll: number, option: string) => {
+    setVotes((current) => ({ ...current, [poll]: option }));
+    toast("Vote locked in. Democracy has spoken. 🗳️");
+  };
+
+  const startGame = () => {
+    setGameStarted(true);
+    setReaction(null);
+    setTargetVisible(false);
+    window.setTimeout(() => {
+      setTargetPosition({ left: 8 + Math.random() * 74, top: 10 + Math.random() * 64 });
+      setTargetVisible(true);
+      (window as any).__crewDuelStarted = performance.now();
+    }, 700 + Math.random() * 1100);
+  };
+
+  const hitTarget = () => {
+    const startedAt = (window as any).__crewDuelStarted;
+    if (!startedAt) return;
+    const ms = Math.round(performance.now() - startedAt);
+    (window as any).__crewDuelStarted = null;
+    setReaction(ms);
+    setTargetVisible(false);
+    setGameStarted(false);
+    toast(ms < 350 ? `🔥 ${ms}ms — streak saved!` : `${ms}ms — Arjun is still talking trash. 😭`);
+  };
+
+  const closeDuel = () => {
+    setDuelOpen(false);
+    setGameStarted(false);
+    setTargetVisible(false);
+    setReaction(null);
+    (window as any).__crewDuelStarted = null;
+  };
 
   return (
-    <main className="shell">
+    <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">C</span><span>CREW</span></div>
+        <div className="logo">CREW<span /></div>
         <div className="mode-switch">
           <button className={mode === "student" ? "active" : ""} onClick={() => setMode("student")}>Student</button>
           <button className={mode === "organizer" ? "active" : ""} onClick={() => setMode("organizer")}>Organizer</button>
         </div>
-        <nav>
-          {["Home", "Discover", "My Crews", "Moments"].map((item) => (
-            <button key={item} className={active === item ? "nav-item active" : "nav-item"} onClick={() => setActive(item)}>
-              <span>{item === "Home" ? "⌂" : item === "Discover" ? "⌕" : item === "My Crews" ? "◎" : "▧"}</span>{item}
-            </button>
+        <nav className="nav">
+          {[["Home", "⌂"], ["My Crew", "◉"], ["Discover", "✦"], ["Tasks", "✓"], ["Events", "◷"], ["Moments", "◌"]].map(([item, icon]) => (
+            <button key={item} className={active === item ? "active" : ""} onClick={() => setActive(item)}><span>{icon}</span>{item}</button>
           ))}
         </nav>
-        <div className="sidebar-bottom">
-          <div className="mini-profile"><div className="avatar">T</div><div><strong>Tenzin</strong><small>Student</small></div><span>•••</span></div>
-          <div className="sidebar-note">Your communities, without the chaos.</div>
-        </div>
+        <div className="profile"><div className="avatar">T</div><div><b>Tenzin</b><div className="small">3 active crews</div></div></div>
       </aside>
 
-      <section className="content">
-        <header className="topbar">
-          <div className="mobile-brand"><span className="brand-mark">C</span> CREW</div>
-          <div className="search">⌕ <span>Search crews, events, people...</span></div>
-          <div className="top-actions"><button className="icon-button">⌘</button><button className="profile-dot">T</button></div>
-        </header>
+      <main>
+        <div className="mobile-top"><div className="mobile-logo">CREW<span /></div><button className="pill" onClick={() => toast("Notifications are suspiciously quiet today. 🔔")}>✦ 4 updates</button></div>
+        <div className="top">
+          <div><h1>Good evening, Tenzin 👋</h1><div className="sub">Your people, your plans, your thing.</div></div>
+          <button className="pill desktop-pill" onClick={() => toast("Notifications are suspiciously quiet today. 🔔")}>✦ 4 updates</button>
+        </div>
 
-        <div className="page-wrap">
-          <section className="hero">
-            <div>
-              <p className="eyebrow">{mode === "student" ? "YOUR CREW, YOUR SPACE" : "ORGANIZER MODE"}</p>
-              <h1>Good evening, Tenzin <span>✦</span></h1>
-              <p className="hero-copy">Find your people. Get things done. Make the moments worth remembering.</p>
+        {mode === "student" ? <div className="grid">
+          <section>
+            <div className="card hero">
+              <div className="eyebrow">YOUR CREW · VALORA</div>
+              <h2>Make something worth remembering.</h2>
+              <p>3 tasks, 1 event and a new quest are waiting for your crew.</p>
+              <button className="cta" onClick={() => toast("Opening the crew space ✨")}>Enter Valora →</button>
             </div>
-            <button className="primary-button" onClick={() => setActive("Discover")}>Explore communities <span>↗</span></button>
+            <div className="stats">
+              <div className="stat"><b>🔥 7</b><span>week streak</span></div>
+              <div className="stat"><b>12</b><span>people met</span></div>
+              <div className="stat"><b>340</b><span>crew points</span></div>
+            </div>
+            <div className="card spaced">
+              <div className="section-title"><h3>🗺️ Today&apos;s quest</h3><span className="link">Campus-wide</span></div>
+              <div className="quest"><div className="quest-icon">🚀</div><div><h4>Build a tiny business</h4><p>Start something real. First crew to submit proof wins.</p></div><button onClick={() => toast("Quest accepted. Go make capitalism nervous. 🚀")}>Accept</button></div>
+            </div>
+            <div className="card spaced">
+              <div className="section-title"><h3>🔥 Takes</h3><span className="link">See all</span></div>
+              <div className="takes">
+                <div className="take"><q>8 AM club meetings should be illegal.</q><div className="vote-row"><button className={votes[1] === "TRUE" ? "vote selected" : "vote"} onClick={() => vote(1, "TRUE")}>TRUE</button><button className={votes[1] === "LIES" ? "vote selected" : "vote"} onClick={() => vote(1, "LIES")}>LIES</button></div></div>
+                <div className="take"><q>Our next social needs better food.</q><div className="vote-row"><button className={votes[2] === "ABSOLUTELY" ? "vote selected" : "vote"} onClick={() => vote(2, "ABSOLUTELY")}>ABSOLUTELY</button><button className={votes[2] === "BROKE" ? "vote selected" : "vote"} onClick={() => vote(2, "BROKE")}>WE&apos;RE BROKE</button></div></div>
+              </div>
+            </div>
           </section>
 
-          {mode === "student" ? (
-            <>
-              <section className="stats-row">
-                <div className="stat"><span>Active crews</span><strong>4</strong><small>+1 this month</small></div>
-                <div className="stat"><span>Events joined</span><strong>12</strong><small>3 this week</small></div>
-                <div className="stat"><span>Meet streak</span><strong>7 <i>days</i></strong><small>Keep it alive 🔥</small></div>
-              </section>
+          <section>
+            <div className="card">
+              <div className="section-title"><h3>🧊 Break the ice</h3><span className="link">New activity</span></div>
+              <div className="ice"><div className="ice-orb">🧊</div><div><h4>Find your unexpected twin</h4><p>Find someone you&apos;ve never spoken to. Discover one thing you both love.</p></div><button className="action" onClick={() => toast("Icebreaker started. Go meet someone 👋")}>Start</button></div>
+            </div>
+            <div className="duel-banner"><div className="fire">⚔️</div><div><b>Keep your 7-week streak</b><div className="small dark-small">Duel a CREW member.</div></div><button onClick={() => setDuelOpen(true)}>Duel</button></div>
+            <div className="card spaced">
+              <div className="section-title"><h3>📸 Moments</h3><span className="link">View memories</span></div>
+              <div className="moments">{moments.map((moment) => <div className="moment" key={moment.title}><span>{moment.emoji} {moment.title}</span></div>)}</div>
+            </div>
+            <div className="card spaced">
+              <div className="section-title"><h3>⚡ Coming up</h3><span className="link">Calendar</span></div>
+              <div className="quest"><div className="quest-icon">🎤</div><div><h4>Finance Summit</h4><p>Friday · 4:30 PM · Main Auditorium</p></div><button onClick={() => toast("Added to your schedule 📅")}>I&apos;m in</button></div>
+            </div>
+          </section>
+        </div> : <div className="organizer-view">
+          <div className="card organizer-hero"><div className="eyebrow">ORGANIZER MODE · VALORA</div><h2>Make your community move.</h2><p>84 members, 16 tasks and 2 events are in motion.</p><button className="cta" onClick={() => toast("New event flow opened ✨")}>Create event +</button></div>
+          <div className="stats"><div className="stat"><b>84</b><span>members</span></div><div className="stat"><b>78%</b><span>participation</span></div><div className="stat"><b>16</b><span>open tasks</span></div></div>
+          <div className="grid equal-grid"><div className="card"><div className="section-title"><h3>📅 Next event</h3><span className="link">Tomorrow</span></div><h4>Valora General Meeting</h4><p>5:30 PM · Seminar Hall 2</p><button className="dark-button" onClick={() => toast("Event manager opened")}>Manage event</button></div><div className="card"><div className="section-title"><h3>✓ Committee tasks</h3><span className="link">4 due today</span></div><div className="task-row">✓ Finish event poster <span>Today</span></div><div className="task-row">✓ Confirm speakers <span>Tomorrow</span></div><div className="task-row">○ Publish Takes poll <span>Friday</span></div></div></div>
+        </div>}
+      </main>
 
-              <div className="grid two-one">
-                <section className="card quest-card">
-                  <div className="section-head"><div><span className="label orange-label">CREW QUEST</span><h2>Make something people remember.</h2></div><span className="quest-icon">⚡</span></div>
-                  <p>Start a tiny business with your crew. Pitch it, build it, and see what happens.</p>
-                  <div className="quest-meta"><span>⏱ 3 days left</span><span>👥 8 crews joined</span><button>Join quest ↗</button></div>
-                </section>
+      {toastMessage && <div className="toast show">{toastMessage}</div>}
 
-                <section className="card duel-card">
-                  <div className="section-head"><div><span className="label">MEET STREAK</span><h2>Quick Duel</h2></div><span className="duel-flash">↯</span></div>
-                  <p>Keep your streak going. Challenge someone from your crew.</p>
-                  <div className="streak-line"><strong>7</strong><span>day streak</span><em>+1 today</em></div>
-                  <button className="dark-button" onClick={() => { setDuelOpen(true); setDuelResult(false); }}>Challenge a crew mate</button>
-                </section>
-              </div>
-
-              <section className="section-block">
-                <div className="section-title"><div><span className="label">YOUR CREWS</span><h2>Places you belong.</h2></div><button onClick={() => setActive("My Crews")}>See all ↗</button></div>
-                <div className="crew-grid">
-                  {crews.map((crew) => <article className="crew-card" key={crew.name}>
-                    <div className={`crew-logo ${crew.color}`}>{crew.emoji}</div>
-                    <div className="crew-info"><h3>{crew.name}</h3><p>{crew.type}</p><span>{crew.members} members</span></div><button className="more">•••</button>
-                  </article>)}
-                </div>
-              </section>
-
-              <div className="grid equal">
-                <section className="card takes-card">
-                  <div className="section-head"><div><span className="label">TAKES</span><h2>What does the crew think?</h2></div><span className="poll-mark">?</span></div>
-                  <p className="poll-question">Best late-night campus food?</p>
-                  {["Momos, obviously 🥟", "Maggi supremacy 🍜", "Whatever is still open 🌙"].map((option, index) => <button key={option} className={liked === index ? "poll-option selected" : "poll-option"} onClick={() => setLiked(index)}><span>{option}</span><b>{[48, 31, 21][index]}%</b></button>)}
-                </section>
-
-                <section className="card ice-card">
-                  <div className="section-head"><div><span className="label">ICEBREAKER</span><h2>Break the awkward silence.</h2></div><span className="ice-icon">✺</span></div>
-                  <p>Find someone who has visited another country. You have 2 minutes.</p>
-                  <div className="ice-footer"><span>👥 8–30 people</span><button className="outline-button">Start icebreaker</button></div>
-                </section>
-              </div>
-
-              <section className="section-block moments-section">
-                <div className="section-title"><div><span className="label">MOMENTS</span><h2>Your crew's story.</h2></div><button onClick={() => setActive("Moments")}>Open archive ↗</button></div>
-                <div className="moments-grid">{moments.map((moment) => <article className="moment" key={moment.title}><div className="moment-image">{moment.emoji}</div><h3>{moment.title}</h3><p>{moment.meta}</p></article>)}</div>
-              </section>
-            </>
-          ) : (
-            <section className="organizer-dashboard">
-              <div className="dashboard-banner"><div><span className="label">ORGANIZER DASHBOARD</span><h2>Valora is moving.</h2><p>32 members active this week. 2 events coming up.</p></div><button className="primary-button">Create event +</button></div>
-              <div className="stats-row"><div className="stat"><span>Members</span><strong>84</strong><small>+12 this month</small></div><div className="stat"><span>Participation</span><strong>78%</strong><small>+9% vs last month</small></div><div className="stat"><span>Tasks open</span><strong>16</strong><small>4 due today</small></div></div>
-              <div className="grid equal"><section className="card"><span className="label">NEXT EVENT</span><h2>Valora General Meeting</h2><p>Tomorrow · 5:30 PM · Seminar Hall 2</p><button className="dark-button">Manage event</button></section><section className="card"><span className="label">TASKS</span><h2>Committee to-do</h2><div className="task"><span className="check">✓</span>Finish event poster <small>Today</small></div><div className="task"><span className="check">✓</span>Confirm speakers <small>Tomorrow</small></div><div className="task"><span className="empty-check"></span>Publish Takes poll <small>Friday</small></div></section></div>
-            </section>
-          )}
-        </div>
-      </section>
-
-      {duelOpen && <div className="modal-backdrop" onClick={() => setDuelOpen(false)}><div className="modal" onClick={(e) => e.stopPropagation()}>{!duelResult ? <><div className="modal-symbol">↯</div><span className="label">QUICK DUEL</span><h2>Challenge someone.</h2><p>Pick a crew mate and settle a 30-second reaction battle.</p><div className="duel-player"><div className="avatar">A</div><div><strong>Arjun</strong><small>Valora · 5 day streak</small></div><button onClick={() => setDuelResult(true)}>Challenge</button></div><div className="duel-player"><div className="avatar alt">S</div><div><strong>Sonam</strong><small>Valora · 9 day streak</small></div><button onClick={() => setDuelResult(true)}>Challenge</button></div><button className="close-button" onClick={() => setDuelOpen(false)}>Not now</button></> : <><div className="result-symbol">✦</div><span className="label">DUEL SENT</span><h2>Let the rivalry begin.</h2><p>Your streak is safe for now. Your crew mate has been challenged.</p><button className="primary-button full" onClick={() => setDuelOpen(false)}>Back to CREW</button></>}</div></div>}
-    </main>
+      {duelOpen && <div className="modal" onClick={closeDuel}><div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        {!gameStarted && !targetVisible && reaction === null ? <>
+          <div className="eyebrow">CREW DUEL · REACTION</div><h2>Challenge someone.</h2><p className="sub">Pick a crew mate, then try to beat their reaction time.</p>
+          <div className="duel-player"><div className="avatar">A</div><div><b>Arjun</b><small>Valora · 5 day streak</small></div><button onClick={startGame}>Challenge</button></div>
+          <div className="duel-player"><div className="avatar alt">S</div><div><b>Sonam</b><small>Valora · 9 day streak</small></div><button onClick={startGame}>Challenge</button></div>
+          <button className="close" onClick={closeDuel}>Not now</button>
+        </> : <>
+          <div className="eyebrow">CREW DUEL · REACTION</div><h2>{reaction !== null ? `${reaction}ms` : "Get ready..."}</h2><p className="sub">{reaction !== null ? "One more round. Your crew is watching. 👀" : "Tap the target the moment it appears."}</p>
+          <div className="duel-game">{targetVisible && <button className="target" style={{ left: `${targetPosition.left}%`, top: `${targetPosition.top}%` }} onClick={hitTarget}>TAP!</button>}{!targetVisible && <button className="game-btn" onClick={startGame}>{reaction !== null ? "Rematch" : "Start duel"}</button>}</div>
+          <button className="close" onClick={closeDuel}>Close</button>
+        </>}
+      </div></div>}
+    </div>
   );
 }
