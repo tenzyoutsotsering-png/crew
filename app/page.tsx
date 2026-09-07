@@ -1,112 +1,88 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-type Tab = "Home" | "Crew" | "Discover" | "Events" | "Tasks" | "Moments";
+type Tab = "Home" | "Crew" | "Discover" | "Tasks" | "Events" | "Moments";
+type Modal = "crew" | "quest" | "duel" | "createEvent" | "moment" | null;
+type Task = { id: number; title: string; crew: string; due: string; done: boolean };
+type EventItem = { id: number; title: string; crew: string; date: string; place: string; emoji: string; going: boolean };
 
-const takes = [
-  ["8 AM club meetings should be illegal.", "TRUE", "LIES"],
-  ["The next social needs better food.", "ABSOLUTELY", "WE'RE BROKE"],
+const defaultTasks: Task[] = [
+  { id: 1, title: "Finish event poster", crew: "Valora", due: "Today", done: false },
+  { id: 2, title: "Confirm speaker details", crew: "Valora", due: "Tomorrow", done: false },
+  { id: 3, title: "Submit Prarambh reflection", crew: "Prarambh", due: "Friday", done: true },
+  { id: 4, title: "Vote on social theme", crew: "Valora", due: "Friday", done: false },
 ];
-
+const defaultEvents: EventItem[] = [
+  { id: 1, title: "Finance Summit", crew: "Valora", date: "Friday · 4:30 PM", place: "Main Auditorium", emoji: "🎤", going: false },
+  { id: 2, title: "General Meeting", crew: "Valora", date: "Tomorrow · 5:30 PM", place: "Seminar Hall 2", emoji: "🪩", going: true },
+  { id: 3, title: "Creator Meetup", crew: "Campus Creators", date: "Sat · 2:00 PM", place: "Student Lounge", emoji: "🎨", going: false },
+];
 const moments = [
-  ["Committee chaos", "📸", "peach"],
-  ["Prarambh finals", "🏆", "purple"],
-  ["That one meeting", "🍜", "lime"],
-  ["New members night", "👋", "blue"],
-];
+  ["Committee chaos", "Valora · 2 days ago", "📸", "peach"], ["Prarambh finals", "Prarambh · 1 week ago", "🏆", "purple"],
+  ["That one meeting", "Valora · 2 weeks ago", "🍜", "lime"], ["New members night", "Valora · 3 weeks ago", "👋", "blue"],
+  ["The winning pitch", "Prarambh · 1 month ago", "🚀", "yellow"], ["Canteen diplomacy", "Valora · 1 month ago", "☕", "pink"],
+] as const;
+const crews = [
+  ["Valora", "Finance & Investment", "📈", 84, true], ["Prarambh", "Debate & strategy", "⚡", 42, true],
+  ["Campus Creators", "Design, video & web", "🎨", 118, false], ["Startup Lab", "Build things together", "🚀", 67, false],
+  ["Music Society", "Jam, perform, repeat", "🎧", 91, false], ["Basketball Crew", "Hoops & chaos", "🏀", 56, false],
+] as const;
+const icebreakers = ["Find someone who has visited another country.", "Find someone with the same birth month as you.", "Two Truths & a Lie. Find three people and guess the lie.", "Find someone whose first job was completely unexpected.", "Ask someone what they'd build if money didn't matter."];
+
+const save = (key: string, value: unknown) => localStorage.setItem(`crew:${key}`, JSON.stringify(value));
+const load = <T,>(key: string, fallback: T): T => { try { const raw = localStorage.getItem(`crew:${key}`); return raw ? JSON.parse(raw) as T : fallback; } catch { return fallback; } };
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("Home");
   const [organizer, setOrganizer] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>(defaultTasks);
+  const [events, setEvents] = useState<EventItem[]>(defaultEvents);
+  const [joined, setJoined] = useState<string[]>(["Valora", "Prarambh"]);
+  const [votes, setVotes] = useState<Record<string, string>>({});
   const [toast, setToast] = useState("");
-  const [votes, setVotes] = useState<Record<number, string>>({});
+  const [modal, setModal] = useState<Modal>(null);
+  const [selectedMoment, setSelectedMoment] = useState<number | null>(null);
   const [quest, setQuest] = useState(false);
-  const [going, setGoing] = useState(false);
-  const [icebreaker, setIcebreaker] = useState("Find someone you haven't talked to yet. Yes, an actual human.");
+  const [icebreaker, setIcebreaker] = useState(icebreakers[0]);
+  const [reaction, setReaction] = useState<number | null>(null);
+  const [game, setGame] = useState(false);
+  const [target, setTarget] = useState(false);
+  const [newEvent, setNewEvent] = useState({ title: "", date: "", place: "" });
 
-  const notify = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 2400);
-  };
+  useEffect(() => { setTasks(load("tasks", defaultTasks)); setEvents(load("events", defaultEvents)); setJoined(load("joined", ["Valora", "Prarambh"])); setVotes(load("votes", {})); setQuest(load("quest", false)); }, []);
+  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2400); };
+  const updateTasks = (next: Task[]) => { setTasks(next); save("tasks", next); };
+  const updateEvents = (next: EventItem[]) => { setEvents(next); save("events", next); };
+  const nav = (next: Tab) => { setTab(next); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const vote = (id: string, value: string) => { const next = { ...votes, [id]: value }; setVotes(next); save("votes", next); notify("Locked in. Democracy survived another day. 🗳️"); };
+  const toggleTask = (id: number) => { const next = tasks.map(t => t.id === id ? { ...t, done: !t.done } : t); updateTasks(next); notify(next.find(t => t.id === id)?.done ? "Tiny W. Task cleared. ✨" : "Task reopened."); };
+  const toggleGoing = (id: number) => { const next = events.map(e => e.id === id ? { ...e, going: !e.going } : e); updateEvents(next); notify(next.find(e => e.id === id)?.going ? "You're in. See you there. 🫡" : "Removed. Your calendar breathes again."); };
+  const join = (name: string) => { if (!joined.includes(name)) { const next = [...joined, name]; setJoined(next); save("joined", next); notify(`You're in ${name}. Welcome to the crew. 👋`); } else notify("You're already in this crew. We checked."); };
+  const startDuel = () => { setGame(true); setReaction(null); setTarget(false); window.setTimeout(() => setTarget(true), 700 + Math.random() * 1100); };
+  const hit = () => { if (!target) return; const ms = 170 + Math.floor(Math.random() * 230); setReaction(ms); setTarget(false); setGame(false); notify(ms < 300 ? `YOU COOKED. ${ms}ms 🔥` : `${ms}ms. Arjun is never letting this go. 😭`); };
+  const createEvent = () => { if (!newEvent.title.trim()) return notify("Give the event a name first, chief."); const item: EventItem = { id: Date.now(), title: newEvent.title, crew: "Valora", date: newEvent.date || "Next week", place: newEvent.place || "TBA", emoji: "✨", going: false }; updateEvents([item, ...events]); setNewEvent({ title: "", date: "", place: "" }); setModal(null); nav("Events"); notify("Event created. Go make it worth showing up for. 🚀"); };
+  const open = (m: Modal) => setModal(m);
+  const pending = tasks.filter(t => !t.done).length;
+  const joinedCrewData = crews.filter(c => joined.includes(c[0]));
+  const discovered = crews.filter(c => !joined.includes(c[0]));
 
-  const vote = (i: number, value: string) => {
-    setVotes({ ...votes, [i]: value });
-    notify("Locked in. Democracy has spoken. 🗳️");
-  };
+  const Home = () => <>
+    <div className="activity-strip"><span className="live-dot"/><b>LIVE</b><span>8 people are doing today's Quest</span><span>·</span><span>Maya just joined Valora</span><span>·</span><span>6 new Takes</span></div>
+    <div className="hero-grid"><section className="hero-card"><div className="hero-copy"><span className="eyebrow">YOUR CREW · VALORA</span><h2>Your people.<br/><i>Your place.</i><br/>Your thing.</h2><p>The place where your crew actually does stuff. Meet, play, build, remember.</p><div className="hero-actions"><button className="primary" onClick={() => open("crew")}>Enter the crew <span>↗</span></button><button className="ghost-light" onClick={() => nav("Discover")}>Find my people</button></div></div><div className="hero-orbit"><div className="orbit orbit-a">👋</div><div className="orbit orbit-b">🔥</div><div className="orbit orbit-c">🎨</div><div className="hero-center">CREW<span>.</span></div></div></section><aside className="today-card"><div className="mini-label">TODAY'S VIBE</div><h3>Something is happening.</h3><div className="today-row"><span>🔥</span><div><b>{pending} things need you</b><small>Across your crews</small></div></div><div className="today-row"><span>👋</span><div><b>3 people you haven't met</b><small>Go say hi. Revolutionary concept.</small></div></div><div className="today-row"><span>⚡</span><div><b>1 Quest is popping off</b><small>Campus-wide · first crew wins</small></div></div><button className="text-button" onClick={() => nav("Crew")}>See what's happening →</button></aside></div>
+    <div className="metric-row"><button onClick={() => notify("7 weeks. Still standing. 🔥")}><b>🔥 7</b><span>week streak</span></button><button onClick={() => notify("12 people met through CREW. Not bad.")}><b>12</b><span>people met</span></button><button onClick={() => notify("340 participation points. Certified W.")}><b>340</b><span>crew points</span></button><button onClick={() => nav("Moments")}><b>19</b><span>moments</span></button></div>
+    <div className="content-grid"><div className="stack"><section className="section-card quest-card" onClick={() => open("quest")}><div className="section-head"><h3>🗺️ Today's side quest</h3><span>Campus-wide</span></div><div className="quest-main"><div className="big-emoji">🚀</div><div><h4>Build a tiny business</h4><p>{quest ? "You're locked in. First crew to submit proof wins." : "Start something real. First crew to submit proof wins."}</p><div className="chips"><em>Race</em><em>3–5 people</em><em>Ends tonight</em></div></div><button className="dark-pill" onClick={(e) => { e.stopPropagation(); setQuest(true); save("quest", true); notify("Quest accepted. Go cook. 🚀"); }}>{quest ? "Locked in" : "Run it"}</button></div></section><section className="section-card"><div className="section-head"><h3>🔥 What's the take?</h3><button onClick={() => notify("More Takes are coming. Humanity has opinions.")}>See all</button></div><div className="takes"><div className="take"><q>8 AM club meetings should be illegal.</q><div><button className={votes.t1 === "FACT" ? "picked" : ""} onClick={() => vote("t1", "FACT")}>FACT</button><button className={votes.t1 === "LIES" ? "picked" : ""} onClick={() => vote("t1", "LIES")}>LIES</button></div></div><div className="take"><q>Our next social needs better food.</q><div><button className={votes.t2 === "ABSOLUTELY" ? "picked" : ""} onClick={() => vote("t2", "ABSOLUTELY")}>ABSOLUTELY</button><button className={votes.t2 === "WE'RE BROKE" ? "picked" : ""} onClick={() => vote("t2", "WE'RE BROKE")}>WE'RE BROKE</button></div></div></div></section></div><div className="stack"><section className="section-card ice-card"><div className="section-head"><h3>🧊 Go meet someone</h3><button onClick={() => { setIcebreaker(icebreakers[Math.floor(Math.random()*icebreakers.length)]); notify("New mission unlocked. 👀"); }}>New one</button></div><div className="ice-main"><div className="ice-visual">🧊</div><div><span className="mini-label">2 MINUTE MISSION</span><h4>Find your unexpected twin</h4><p>{icebreaker}</p><button className="purple-pill" onClick={() => notify("Mission started. Go find them. 👋")}>Start mission</button></div></div></section><section className="duel-card"><div><span>⚔️</span><div><b>Someone thinks they're faster than you.</b><small>Keep the 7-week streak alive.</small></div></div><button onClick={() => open("duel")}>Run it</button></section><section className="section-card"><div className="section-head"><h3>📸 The lore</h3><button onClick={() => nav("Moments")}>All moments</button></div><div className="moment-grid">{moments.slice(0,3).map((m,i)=><button key={m[0]} className={`moment ${m[3]}`} onClick={() => {setSelectedMoment(i);open("moment")}}><span>{m[2]}</span><b>{m[0]}</b></button>)}</div></section></div></div>
+  </>;
 
-  const nav = (next: Tab) => {
-    setTab(next);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const Crew = () => <div className="page"><div className="page-title"><div><span className="eyebrow">YOUR PEOPLE</span><h2>The crew</h2><p>Communities you're actually part of.</p></div><button className="primary dark" onClick={() => nav("Discover")}>+ Find my people</button></div><div className="crew-cards">{joinedCrewData.map(c=><button className="crew-big" key={c[0]} onClick={() => open("crew")}><span className="crew-icon">{c[2]}</span><div><span className="status">● ACTIVE</span><h3>{c[0]}</h3><p>{c[1]}</p><small>{c[3]} people · 3 things happening</small></div><b>↗</b></button>)}</div><section className="pulse"><div><span>RIGHT NOW</span><h3>Valora is kinda alive today.</h3><p>8 people are active · 2 conversations · 1 Quest · 4 new Moments</p></div><div className="face-stack"><span>🧑🏽</span><span>👩🏻</span><span>🧑🏿</span><span>👨🏼</span><b>+8</b></div></section></div>;
+  const Discover = () => <div className="page"><div className="page-title"><div><span className="eyebrow">EXPLORE</span><h2>Find your people.</h2><p>Not followers. Actual humans you might end up knowing.</p></div></div><div className="search"><span>⌕</span><input placeholder="Search crews, interests, chaos..."/><kbd>⌘ K</kbd></div><div className="discover-grid">{discovered.map(c=><article className="discover-card" key={c[0]}><div className="discover-icon">{c[2]}</div><span className="tag">{c[1]}</span><h3>{c[0]}</h3><p>{c[3]} people · active today</p><button className="join" onClick={() => join(c[0])}>{joined.includes(c[0]) ? "You're in" : "Join crew →"}</button></article>)}</div></div>;
+  const Tasks = () => <div className="page"><div className="page-title"><div><span className="eyebrow">YOUR TO-DO LORE</span><h2>Stuff to do.</h2><p>Because someone has to make the thing happen.</p></div><span className="count-pill">{pending} left</span></div><div className="task-list">{tasks.map(t=><button key={t.id} className={`task ${t.done ? "done" : ""}`} onClick={()=>toggleTask(t.id)}><span className="check">{t.done ? "✓" : ""}</span><div><b>{t.title}</b><small>{t.crew} · {t.due}</small></div><span className="task-arrow">{t.done ? "W" : "→"}</span></button>)}</div></div>;
+  const Events = () => <div className="page"><div className="page-title"><div><span className="eyebrow">YOUR CREWS</span><h2>What's happening 👀</h2><p>Stuff worth leaving your room for.</p></div>{organizer && <button className="primary dark" onClick={()=>open("createEvent")}>+ Make a thing</button>}</div><div className="event-list">{events.map(e=><article className="event" key={e.id}><div className="event-art">{e.emoji}</div><div className="event-info"><span className="tag">{e.crew}</span><h3>{e.title}</h3><p>{e.date} · {e.place}</p><div className="going"><span>🧑🏽‍🤝‍🧑🏻</span> 18 people are in</div></div><button className={e.going ? "going-btn active" : "going-btn"} onClick={()=>toggleGoing(e.id)}>{e.going ? "I'm in ✓" : "I'm in"}</button></article>)}</div></div>;
+  const Moments = () => <div className="page"><div className="page-title"><div><span className="eyebrow">YOUR LORE</span><h2>Proof you did stuff.</h2><p>The little things that become the stories later.</p></div><button className="primary dark" onClick={()=>notify("Moment capture is ready for the mobile app. 📸")}>+ Add moment</button></div><div className="moments-wall">{moments.map((m,i)=><button key={m[0]} className={`wall-card ${m[3]}`} onClick={()=>{setSelectedMoment(i);open("moment")}}><span>{m[2]}</span><div><b>{m[0]}</b><small>{m[1]}</small></div></button>)}</div></div>;
+  const Organizer = () => <div className="page"><div className="org-head"><div><span className="eyebrow">ORGANIZER MODE · VALORA</span><h2>Make the crew move.</h2><p>Less spreadsheet archaeology. More actual community.</p></div><button className="primary dark" onClick={()=>open("createEvent")}>+ Make a thing</button></div><div className="org-stats"><div><b>84</b><span>members</span></div><div><b>78%</b><span>participation</span></div><div><b>{pending}</b><span>open tasks</span></div><div><b>19</b><span>Moments</span></div></div><div className="org-grid"><section className="section-card"><div className="section-head"><h3>⚡ What's moving</h3><span>LIVE</span></div><div className="activity"><p><b>Maya</b> joined Valora</p><p><b>8 members</b> started the Quest</p><p><b>6 people</b> voted on a Take</p><p><b>Rohan</b> checked in</p></div></section><section className="section-card"><div className="section-head"><h3>✓ Committee stuff</h3><button onClick={()=>nav("Tasks")}>All tasks</button></div>{tasks.slice(0,3).map(t=><button className="org-task" key={t.id} onClick={()=>toggleTask(t.id)}>{t.done?"✓":"○"} {t.title}<small>{t.due}</small></button>)}</section></div></div>;
 
-  const nextIcebreaker = () => {
-    const prompts = [
-      "Find someone with the same birth month as you.",
-      "Find someone who has visited another country.",
-      "Ask someone what they'd build if money didn't matter.",
-      "Find someone whose music taste you absolutely need to judge.",
-    ];
-    setIcebreaker(prompts[Math.floor(Math.random() * prompts.length)]);
-    notify("New side quest unlocked. Go talk to someone 👋");
-  };
-
-  const home = (
-    <>
-      <div className="live-bar"><span className="live-dot" /> <b>Valora is alive</b><span>8 people are active right now</span><button onClick={() => notify("You have entered the chaos. 🫡")}>See what's happening →</button></div>
-
-      <section className="hero">
-        <div className="hero-copy">
-          <span className="eyebrow">YOUR CREW · VALORA</span>
-          <h2>Your people.<br /><em>Your place.</em><br />Your thing.</h2>
-          <p>Don't just join a club. Actually be part of it.</p>
-          <div className="hero-actions"><button className="primary" onClick={() => notify("Welcome back to Valora. 🫡")}>Enter the crew →</button><button className="ghost" onClick={() => nav("Discover")}>Find more people</button></div>
-        </div>
-        <div className="hero-orbit"><div className="orbit-card one">🔥 <b>7 week streak</b></div><div className="orbit-card two">👋 <b>12 people met</b></div><div className="orbit-card three">🚀 <b>Quest active</b></div><div className="orbit-center">CREW<span>•</span></div></div>
-      </section>
-
-      <div className="quick-stats"><button onClick={() => notify("Still going after 7 weeks. Certified W. 🔥")}><b>🔥 7</b><span>week streak</span></button><button onClick={() => notify("12 people met through CREW. Keep going.")}><b>12</b><span>people met</span></button><button onClick={() => notify("340 points from actually participating. Not bad.")}><b>340</b><span>crew points</span></button></div>
-
-      <div className="section-grid">
-        <div className="stack">
-          <section className="panel quest-panel">
-            <div className="panel-head"><div><span className="eyebrow">CAMPUS-WIDE · 37 CREWS</span><h3>🗺️ Today's side quest</h3></div><span className="hot">LIVE</span></div>
-            <div className="quest-main"><div className="quest-art">🚀</div><div className="grow"><h4>Build a tiny business</h4><p>{quest ? "You're in. First crew to submit proof wins." : "Start something real. First crew to submit proof wins."}</p><div className="chips"><span>⚡ Race</span><span>👥 Team up</span><span>🏆 Prize</span></div></div><button className="dark" onClick={() => { setQuest(true); notify("Quest accepted. Go cook. 🚀"); }}>{quest ? "You're in" : "Run it"}</button></div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-head"><div><span className="eyebrow">THE CREW HAS SPOKEN</span><h3>🔥 What's the take?</h3></div><button className="text-button" onClick={() => notify("More takes coming soon 👀")}>All takes →</button></div>
-            <div className="takes">{takes.map((take, i) => <div className="take" key={take[0]}><q>{take[0]}</q><div className="vote-row"><button className={votes[i] === take[1] ? "vote selected" : "vote"} onClick={() => vote(i, take[1])}>{take[1]}</button><button className={votes[i] === take[2] ? "vote selected" : "vote"} onClick={() => vote(i, take[2])}>{take[2]}</button></div></div>)}</div>
-          </section>
-        </div>
-
-        <div className="stack">
-          <section className="panel ice-panel"><div className="panel-head"><div><span className="eyebrow">SOCIAL XP, BUT MAKE IT REAL</span><h3>🧊 Go meet someone</h3></div><button className="text-button" onClick={nextIcebreaker}>New one</button></div><div className="ice-content"><div className="ice-icon">🧊</div><div className="grow"><h4>Today's icebreaker</h4><p>{icebreaker}</p></div></div><button className="full-button" onClick={() => notify("Icebreaker started. Your social life has been notified. 👋")}>I'm doing it →</button></section>
-
-          <section className="duel"><div className="duel-icon">⚔️</div><div className="grow"><span className="eyebrow">STREAK ON THE LINE</span><h3>Someone wants a Duel.</h3><p>Arjun thinks he's faster than you. Suspicious.</p></div><button onClick={() => notify("Duel queued. Prepare to defend your honor. ⚡")}>Run it</button></section>
-
-          <section className="panel"><div className="panel-head"><div><span className="eyebrow">THE LORE</span><h3>📸 Moments</h3></div><button className="text-button" onClick={() => nav("Moments")}>See all →</button></div><div className="moment-grid">{moments.map(([title, emoji, tone]) => <button key={title} className={`moment ${tone}`} onClick={() => notify(`${title} added to the lore. 📸`)}><span>{emoji}</span><b>{title}</b></button>)}</div></section>
-
-          <section className="next-event"><div className="event-date"><b>FRI</b><strong>18</strong></div><div className="grow"><span className="eyebrow">VALORA · 4:30 PM</span><h3>Finance Summit</h3><p>Main Auditorium · 84 people invited</p></div><button onClick={() => { setGoing(!going); notify(going ? "You're off the list." : "You're in. See you there. 📅"); }}>{going ? "Going ✓" : "I'm in"}</button></section>
-        </div>
-      </div>
-    </>
-  );
-
-  const discover = <div className="page"><span className="eyebrow">GO TOUCH GRASS, SOCIALLY</span><h2>Find your people.</h2><p className="page-sub">Communities are better when you actually know who's in them.</p><div className="discover-grid">{[["Valora","Finance & Investment","📈","84"],["Prarambh","Debate & Strategy","⚡","42"],["Campus Creators","Design, video & web","🎨","118"],["Startup Lab","Build things together","🚀","67"]].map(([name,type,emoji,count]) => <div className="discover-card" key={name}><div className="big-emoji">{emoji}</div><div className="grow"><h3>{name}</h3><p>{type}</p><small>{count} people · active today</small></div><button onClick={() => notify(`You're checking out ${name}. 👀`)}>Enter →</button></div>)}</div></div>;
-
-  const events = <div className="page"><span className="eyebrow">STUFF ACTUALLY HAPPENING</span><h2>What's on?</h2><p className="page-sub">No spreadsheet archaeology required.</p><div className="event-list">{[["Finance Summit","FRI 18","4:30 PM","Main Auditorium","📈"],["Valora General Meeting","SAT 19","5:30 PM","Seminar Hall 2","🗣️"],["Creator Meetup","SUN 20","2:00 PM","Student Lounge","🎨"]].map(e => <div className="event-card" key={e[0]}><div className="event-emoji">{e[4]}</div><div className="grow"><span className="eyebrow">{e[1]} · {e[2]}</span><h3>{e[0]}</h3><p>{e[3]}</p></div><button onClick={() => notify(`You're on the list for ${e[0]}. 📅`)}>I'm in</button></div>)}</div></div>;
-
-  const tasks = <div className="page"><span className="eyebrow">YES, THINGS NEED DOING</span><h2>Stuff to do.</h2><p className="page-sub">Tiny victories count.</p><div className="task-list">{["Finish event poster","Confirm speaker details","Submit Prarambh reflection","Vote on social theme"].map((task,i) => <button key={task} onClick={() => notify(i === 2 ? "Already done. Certified W. ✨" : "Task checked. One less thing haunting you.")}><span className={i===2 ? "check done" : "check"}>{i===2 ? "✓" : ""}</span><b>{task}</b><small>{i===0 ? "Today" : i===1 ? "Tomorrow" : "Friday"}</small></button>)}</div></div>;
-
-  const crew = <div className="page"><span className="eyebrow">YOUR PEOPLE</span><h2>The crew.</h2><p className="page-sub">The people you chose to build something with.</p><div className="crew-hero"><div className="crew-avatar">📈</div><div className="grow"><span className="eyebrow">VALORA · 84 MEMBERS</span><h3>Finance & Investment</h3><p>68% participated this month · 19 moments · 7 active quests</p></div><button className="primary" onClick={() => notify("You're in Valora. 🫡")}>I'm here</button></div><div className="people-row"><div><b>👩🏻‍💻 Maya</b><span>just joined</span></div><div><b>🧑🏽‍🎨 Arjun</b><span>doing today's Quest</span></div><div><b>👨🏾‍💼 Riya</b><span>at Finance Summit</span></div></div></div>;
-
-  const momentsPage = <div className="page"><span className="eyebrow">PROOF YOU DID STUFF</span><h2>The lore.</h2><p className="page-sub">Every meeting, win, disaster and “remember when...” in one place.</p><div className="lore-grid">{moments.concat([["The winning pitch","🚀","yellow"],["Canteen diplomacy","☕","pink"]]).map(([title,emoji,tone]) => <button key={title} className={`lore ${tone}`} onClick={() => notify(`${title}. A certified CREW moment. 📸`)}><span>{emoji}</span><h3>{title}</h3><p>Valora · recently</p></button>)}</div></div>;
-
-  let content = tab === "Home" ? home : tab === "Crew" ? crew : tab === "Discover" ? discover : tab === "Events" ? events : tab === "Tasks" ? tasks : momentsPage;
-
-  return <div className="app-shell">
-    <aside className="sidebar"><button className="logo" onClick={() => nav("Home")}>CREW<span>•</span></button><div className="mode-switch"><button className={!organizer ? "active" : ""} onClick={() => setOrganizer(false)}>Student</button><button className={organizer ? "active" : ""} onClick={() => { setOrganizer(true); notify("Organizer mode. Time to make things happen. 🫡"); }}>Organize</button></div><nav>{(["Home","Crew","Discover","Events","Tasks","Moments"] as Tab[]).map(item => <button key={item} className={tab === item ? "active" : ""} onClick={() => nav(item)}>{item === "Crew" ? "◎" : item === "Discover" ? "✦" : item === "Events" ? "◷" : item === "Tasks" ? "✓" : item === "Moments" ? "◌" : "⌂"}<span>{item === "Crew" ? "My Crew" : item}</span></button>)}</nav><div className="profile"><div className="avatar">T</div><div><b>Tenzin</b><small>Valora · 7 🔥</small></div></div></aside>
-    <main><div className="mobile-top"><button className="logo">CREW<span>•</span></button><button onClick={() => setOrganizer(!organizer)}>{organizer ? "Student" : "Organize"}</button></div><header className="top"><div><h1>{organizer ? "Make it happen." : tab === "Home" ? "Hey, Tenzin 👋" : tab === "Crew" ? "Your people." : tab === "Discover" ? "Find your people." : tab === "Events" ? "What's on?" : tab === "Tasks" ? "Stuff to do." : "The lore."}</h1><p>{organizer ? "Your crew has stuff to do. Let's cook." : "Your communities, without the corporate energy."}</p></div><button className="top-pill" onClick={() => notify("No new drama. For now. 👀")}>🔔 3</button></header>{organizer ? <div className="organizer"><section className="organizer-hero"><span className="eyebrow">ORGANIZER MODE · VALORA</span><h2>Make your community move.</h2><p>84 members · 3 events · 4 things to finish</p><button className="primary" onClick={() => notify("Event creation opened. Let's make it good.")}>Create something +</button></section><div className="organizer-grid"><div className="panel"><span className="eyebrow">RIGHT NOW</span><h3>Community pulse</h3><div className="pulse"><b>68%</b><span>event participation</span><b>41</b><span>new conversations</span><b>19</b><span>Moments shared</span></div></div><div className="panel"><span className="eyebrow">DON'T FORGET</span><h3>Stuff to do.</h3><p>Finish event poster</p><p>Confirm speaker details</p><p>Post the Finance Summit update</p><button className="dark full" onClick={() => { setOrganizer(false); nav("Tasks"); }}>See all tasks →</button></div></div></div> : content}</main><div className={toast ? "toast show" : "toast"}>{toast}</div>
+  return <div className="app"><aside><button className="brand" onClick={()=>nav("Home")}>CREW<span>.</span></button><div className="mode-toggle"><button className={!organizer?"on":""} onClick={()=>setOrganizer(false)}>Student</button><button className={organizer?"on":""} onClick={()=>setOrganizer(true)}>Organizer</button></div><nav>{([["Home","⌂"],["Crew","◉"],["Discover","✦"],["Tasks","✓"],["Events","◷"],["Moments","◌"]] as [Tab,string][]).map(([name,icon])=><button key={name} className={tab===name?"active":""} onClick={()=>nav(name)}><span>{icon}</span>{name}</button>)}</nav><div className="side-profile"><div className="avatar">T</div><div><b>Tenzin</b><small>2 crews · 7 week streak</small></div><button onClick={()=>notify("Settings are coming. We have bigger fish to fry.")}>•••</button></div></aside><main><header><div><span className="mobile-brand">CREW<span>.</span></span><p className="greeting">{organizer ? "Organizer mode" : "Good evening, Tenzin 👋"}</p><h1>{organizer ? "Your command center." : tab === "Home" ? "What's the move?" : tab}</h1></div><div className="header-actions"><button className="circle" onClick={()=>notify("No new emergencies. You're good. 🫡")}>◌</button><button className="profile-chip" onClick={()=>notify("Your profile lore: 7-week streak. 🔥")}>T</button></div></header>{organizer ? <Organizer/> : tab === "Home" ? <Home/> : tab === "Crew" ? <Crew/> : tab === "Discover" ? <Discover/> : tab === "Tasks" ? <Tasks/> : tab === "Events" ? <Events/> : <Moments/>}</main>
+    {toast && <div className="toast">{toast}</div>}
+    {modal && <div className="overlay" onMouseDown={(e)=>{if(e.currentTarget===e.target)setModal(null)}}><div className="modal">{modal === "crew" && <><div className="modal-icon">📈</div><span className="eyebrow">VALORA</span><h2>Welcome to the lore.</h2><p>84 people. Finance, investment, debates, questionable canteen decisions.</p><div className="modal-actions"><button onClick={()=>{setModal(null);notify("You're in. Go make some memories. 👋")}}>Enter the crew →</button><button className="soft" onClick={()=>setModal(null)}>Not now</button></div></>}{modal === "quest" && <><div className="modal-icon">🚀</div><span className="eyebrow">CAMPUS-WIDE QUEST</span><h2>Build a tiny business.</h2><p>Grab 3–5 people. Build something real. Submit proof before tonight. First crew wins.</p><div className="quest-rules"><span>🏁 Race</span><span>👥 3–5 people</span><span>⏰ Tonight</span></div><button className="full" onClick={()=>{setQuest(true);save("quest",true);setModal(null);notify("Quest accepted. Go cook. 🔥")}}>{quest?"Locked in":"I'm doing it"}</button></>}{modal === "duel" && <><div className="modal-icon">⚔️</div><span className="eyebrow">CREW DUEL</span><h2>{reaction ? `${reaction}ms. Certified.` : "Prove it."}</h2><p>Tap the target as soon as it appears. No excuses. The group chat will hear about this.</p><div className="game" onClick={hit}>{target && <button className="target" onClick={hit}>TAP</button>}{!game && !reaction && <button className="full" onClick={(e)=>{e.stopPropagation();startDuel()}}>Start duel</button>}{game && !target && <span>Get ready... 👀</span>}{reaction && <span className="result">🔥 {reaction}ms</span>}</div><button className="soft full" onClick={()=>setModal(null)}>Close</button></>}{modal === "moment" && selectedMoment !== null && <><div className={`modal-moment ${moments[selectedMoment][3]}`}>{moments[selectedMoment][2]}</div><span className="eyebrow">{moments[selectedMoment][1]}</span><h2>{moments[selectedMoment][0]}</h2><p>One of those random little moments that somehow becomes part of the lore.</p><button className="full" onClick={()=>setModal(null)}>Keep scrolling →</button></>}{modal === "createEvent" && <><span className="eyebrow">ORGANIZER</span><h2>Make a thing.</h2><p>Give people a reason to actually leave their rooms.</p><label>Event name<input value={newEvent.title} onChange={e=>setNewEvent({...newEvent,title:e.target.value})} placeholder="e.g. Finance Club After Dark"/></label><label>When<input value={newEvent.date} onChange={e=>setNewEvent({...newEvent,date:e.target.value})} placeholder="Friday · 5:30 PM"/></label><label>Where<input value={newEvent.place} onChange={e=>setNewEvent({...newEvent,place:e.target.value})} placeholder="Student Lounge"/></label><button className="full" onClick={createEvent}>Publish it 🚀</button></>}</div></div>}
   </div>;
 }
